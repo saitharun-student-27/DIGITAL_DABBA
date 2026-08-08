@@ -1,4 +1,4 @@
-# Digital Dabba 🍱
+# Digital Dabba 
 
 Digital Dabba is a web platform that connects home/cloud kitchens with customers for daily meal ordering — think a modern, tech-driven version of the traditional Indian "dabba" (tiffin) delivery system. It gives kitchens a dashboard to manage menus, inventory, and production, and gives customers a simple way to discover kitchens, order meals, and track deliveries.
 
