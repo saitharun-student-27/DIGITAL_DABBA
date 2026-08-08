@@ -40,7 +40,14 @@ export async function GET(request: Request) {
       orderBy: { rating: 'desc' },
     });
 
-    return NextResponse.json({ kitchens });
+    return NextResponse.json(
+      { kitchens },
+      {
+        headers: {
+          'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60',
+        },
+      }
+    );
   } catch (error: any) {
     console.error('Fetch kitchens error:', error);
     return NextResponse.json({ error: 'Failed to fetch kitchens' }, { status: 500 });

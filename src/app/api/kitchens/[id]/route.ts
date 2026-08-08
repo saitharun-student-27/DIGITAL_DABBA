@@ -50,10 +50,17 @@ export async function GET(
       createdAt: r.createdAt,
     }));
 
-    return NextResponse.json({
-      kitchen,
-      reviews: formattedReviews,
-    });
+    return NextResponse.json(
+      {
+        kitchen,
+        reviews: formattedReviews,
+      },
+      {
+        headers: {
+          'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60',
+        },
+      }
+    );
   } catch (error: any) {
     console.error('Fetch kitchen details error:', error);
     return NextResponse.json({ error: 'Failed to fetch kitchen details' }, { status: 500 });
