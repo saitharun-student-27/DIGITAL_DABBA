@@ -1,0 +1,210 @@
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id              String           @id @default(uuid())
+  email           String           @unique
+  passwordHash    String
+  name            String
+  phone           String?
+  role            String           // "CUSTOMER" | "KITCHEN" | "ADMIN"
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  customerProfile CustomerProfile?
+  kitchenProfile  Kitchen?
+  notifications   Notification[]
+}
+
+model CustomerProfile {
+  id                String             @id @default(uuid())
+  userId            String             @unique
+  address           String
+  latitude          Float?
+  longitude         Float?
+  orders            Order[]
+  mealSubscriptions MealSubscription[]
+  reviews           Review[]
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Kitchen {
+  id                  String               @id @default(uuid())
+  userId              String               @unique
+  name                String
+  cuisine             String
+  description         String?
+  coverImage          String?
+  logo                String?
+  status              String               // "PENDING_ONBOARDING" | "PENDING_VERIFICATION" | "ACTIVE" | "INACTIVE"
+  cutoffTime          String               @default("21:00") // e.g. "21:00"
+  deliveryFee         Float                @default(40.0)
+  minOrderValue       Float                @default(0.0)
+  deliveryArea        String?              // List of zones or JSON
+  
+  // Dynamic stats compiled from database for trust verification
+  successfulDeliveries Int                @default(0)
+  onTimeRate          Float                @default(100.0)
+  rating              Float                @default(5.0)
+  ratingCount         Int                  @default(0)
+  repeatCustomersCount Int                 @default(0)
+  
+  user                User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  menuItems           MenuItem[]
+  orders              Order[]
+  inventory           InventoryItem[]
+  subscription        KitchenSubscription?
+  manifests           ProductionManifest[]
+}
+
+model KitchenSubscription {
+  id             String    @id @default(uuid())
+  kitchenId      String    @unique
+  planName       String    // "STARTER" | "GROWTH" | "PRO"
+  planPrice      Float
+  status         String    // "ACTIVE" | "PAUSED" | "CANCELLED"
+  billingCycle   String    // "MONTHLY" | "ANNUAL"
+  nextPaymentDate DateTime
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  kitchen        Kitchen   @relation(fields: [kitchenId], references: [id], onDelete: Cascade)
+}
+
+model MenuItem {
+  id          String      @id @default(uuid())
+  kitchenId   String
+  name        String
+  description String
+  price       Float
+  image       String?
+  category    String      // "LUNCH" | "DINNER" | "HEALTHY" | "BUDGET" | "FAMILY"
+  isAvailable Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  kitchen     Kitchen     @relation(fields: [kitchenId], references: [id], onDelete: Cascade)
+  orderItems  OrderItem[]
+}
+
+model Order {
+  id              String           @id @default(uuid())
+  customerId      String
+  kitchenId       String
+  status          String           // "PENDING_PAYMENT" | "CONFIRMED" | "PREPARING" | "PACKED" | "OUT_FOR_DELIVERY" | "DELIVERED" | "CANCELLED"
+  subtotal        Float
+  deliveryFee     Float
+  total           Float
+  deliveryDate    String           // YYYY-MM-DD
+  deliverySlot    String           // e.g. "12:00 PM - 1:00 PM"
+  deliveryAddress String
+  paymentId       String?
+  paymentStatus   String           @default("PENDING") // "PENDING" | "PAID" | "FAILED"
+  
+  // Feedback
+  rating          Int?
+  reviewText      String?
+  foodQualityRating Int?
+  packagingRating Int?
+  deliveryRating  Int?
+  
+  // Status timestamps
+  confirmedAt     DateTime?
+  preparingAt     DateTime?
+  packedAt        DateTime?
+  outForDeliveryAt DateTime?
+  deliveredAt     DateTime?
+  cancelledAt     DateTime?
+  
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  
+  customer        CustomerProfile  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  kitchen         Kitchen          @relation(fields: [kitchenId], references: [id], onDelete: Cascade)
+  items           OrderItem[]
+  reviews         Review[]
+}
+
+model OrderItem {
+  id         String   @id @default(uuid())
+  orderId    String
+  menuItemId String
+  name       String
+  quantity   Int
+  price      Float
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+}
+
+model InventoryItem {
+  id             String   @id @default(uuid())
+  kitchenId      String
+  ingredientName String
+  requiredQty    Float    @default(0.0)
+  availableQty   Float    @default(0.0)
+  unit           String   // "kg", "grams", "units", "liters"
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  kitchen        Kitchen  @relation(fields: [kitchenId], references: [id], onDelete: Cascade)
+  
+  @@unique([kitchenId, ingredientName])
+}
+
+model MealSubscription {
+  id               String          @id @default(uuid())
+  customerId       String
+  kitchenId        String
+  planName         String          // "Weekly Lunch", "Monthly Dinner", etc.
+  mealsIncluded    Int
+  price            Float
+  deliverySchedule String          // JSON string representation of days (e.g. ["MON", "WED", "FRI"])
+  status           String          // "ACTIVE" | "PAUSED" | "CANCELLED"
+  nextDeliveryDate String          // YYYY-MM-DD
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  customer         CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Cascade)
+}
+
+model Review {
+  id         String          @id @default(uuid())
+  customerId String
+  orderId    String
+  rating     Int
+  text       String
+  createdAt  DateTime        @default(now())
+  customer   CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  order      Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  title     String
+  message   String
+  isRead    Boolean  @default(false)
+  type      String   // "INFO" | "ORDER_STATUS" | "ALERT"
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ProductionManifest {
+  id           String                   @id @default(uuid())
+  kitchenId    String
+  date         String                   // YYYY-MM-DD
+  totalMeals   Int
+  status       String                   // "DRAFT" | "LOCKED" | "COMPLETED"
+  createdAt    DateTime                 @default(now())
+  kitchen      Kitchen                  @relation(fields: [kitchenId], references: [id], onDelete: Cascade)
+  items        ProductionManifestItem[]
+}
+
+model ProductionManifestItem {
+  id         String             @id @default(uuid())
+  manifestId String
+  itemName   String
+  quantity   Int
+  manifest   ProductionManifest @relation(fields: [manifestId], references: [id], onDelete: Cascade)
+}
